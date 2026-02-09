@@ -1,4 +1,4 @@
-"""High-level memory API built on FAISS + sentence-transformers."""
+"""High-level memory API built on FAISS + Ollama embeddings."""
 
 import os
 from datetime import datetime, timezone
@@ -20,15 +20,25 @@ class MemoryManager:
 
     def __init__(self, config: AgentConfig):
         self.config = config
-        self.embedding_engine = EmbeddingEngine.get(config.embedding_model)
+        self.embedding_engine = EmbeddingEngine.get(
+            config.embedding_model,
+            config.chat_model.base_url,
+        )
         self._stores: dict[str, FAISSStore] = {}
+        self._dimension: int | None = None
+
+    def _get_dimension(self) -> int:
+        """Get embedding dimension, probing Ollama if needed."""
+        if self._dimension is None:
+            self._dimension = self.embedding_engine.get_dimension()
+        return self._dimension
 
     def _get_store(self, subdir: str = "default") -> FAISSStore:
         """Get or create a FAISS store for a subdirectory."""
         if subdir not in self._stores:
             directory = os.path.join(self.config.memory_dir, subdir)
             self._stores[subdir] = FAISSStore(
-                directory, self.embedding_engine.dimension
+                directory, self._get_dimension()
             )
         return self._stores[subdir]
 
