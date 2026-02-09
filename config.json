@@ -1,0 +1,26 @@
+{
+  "chat_model": {
+    "model_name": "llama3.2",
+    "base_url": "http://localhost:11434",
+    "temperature": 0.7,
+    "ctx_length": 8192,
+    "options": {}
+  },
+  "utility_model": {
+    "model_name": "llama3.2",
+    "base_url": "http://localhost:11434",
+    "temperature": 0.3,
+    "ctx_length": 4096,
+    "options": {}
+  },
+  "embedding_model": "all-MiniLM-L6-v2",
+  "prompt_profile": "default",
+  "max_monologue_iterations": 25,
+  "memory_recall_enabled": true,
+  "memory_recall_threshold": 0.6,
+  "memory_recall_count": 5,
+  "data_dir": "data",
+  "knowledge_dir": "data/knowledge",
+  "memory_dir": "data/memory",
+  "log_dir": "data/logs"
+}

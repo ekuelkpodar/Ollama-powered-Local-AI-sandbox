@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local Ollama Agents</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/chat.js"></script>
+    <script src="/static/js/settings.js"></script>
+</head>
+<body>
+
+<div class="app-container" x-data="{ settingsOpen: false }">
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h1>Local Ollama Agents</h1>
+            <div class="subtitle">Multi-Agent AI Framework</div>
+        </div>
+
+        <div class="sidebar-actions">
+            <button @click="$dispatch('new-session')">+ New Chat</button>
+        </div>
+
+        <div class="sidebar-nav">
+            <button class="active" @click="settingsOpen = false">Chat</button>
+            <button @click="settingsOpen = !settingsOpen">Settings</button>
+        </div>
+
+        <div class="sidebar-footer" x-data="{ status: 'checking' }" x-init="
+            fetch('/api/models').then(r => r.json()).then(d => {
+                status = d.error ? 'offline' : 'online'
+            }).catch(() => { status = 'offline' })
+        ">
+            <span class="status-dot" :class="status"></span>
+            <span x-text="status === 'online' ? 'Ollama connected' : status === 'offline' ? 'Ollama offline' : 'Checking...'"></span>
+        </div>
+    </div>
+
+    <!-- Main Chat Area -->
+    <div class="main-area" x-data="chatComponent()" x-init="init()" @new-session.window="newSession()">
+
+        <!-- Chat Header -->
+        <div class="chat-header">
+            <span>Agent 0 — Monologue Loop</span>
+            <span x-show="isProcessing" style="color: var(--yellow);">
+                <span class="streaming-dot"></span> Processing...
+            </span>
+        </div>
+
+        <!-- Messages -->
+        <div class="chat-messages">
+            <!-- Welcome message -->
+            <template x-if="messages.length === 0 && !streamingContent">
+                <div style="text-align: center; padding: 60px 20px; color: var(--text-secondary);">
+                    <div style="font-size: 40px; margin-bottom: 16px;">&#129302;</div>
+                    <div style="font-size: 18px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">
+                        Local Ollama Agents
+                    </div>
+                    <div style="font-size: 13px; max-width: 400px; margin: 0 auto; line-height: 1.6;">
+                        Send a message to start. Agent 0 will reason, use tools,
+                        execute code, and delegate to subordinate agents as needed.
+                    </div>
+                </div>
+            </template>
+
+            <!-- Message list -->
+            <template x-for="(msg, i) in messages" :key="i">
+                <div class="message" :class="msg.role">
+                    <template x-if="msg.role === 'assistant'">
+                        <div class="agent-label">Agent 0</div>
+                    </template>
+                    <div x-text="msg.content"></div>
+                    <template x-if="msg.reasoning && msg.reasoning !== msg.content">
+                        <details style="margin-top: 8px; font-size: 12px;">
+                            <summary style="cursor: pointer; color: var(--text-secondary);">Show reasoning</summary>
+                            <div class="tool-call" x-text="msg.reasoning" style="margin-top: 4px; max-height: 200px; overflow-y: auto;"></div>
+                        </details>
+                    </template>
+                </div>
+            </template>
+
+            <!-- Streaming content -->
+            <template x-if="streamingContent">
+                <div class="message assistant">
+                    <div class="agent-label">Agent 0 <span class="streaming-dot"></span></div>
+                    <div x-text="streamingContent" style="opacity: 0.8;"></div>
+                </div>
+            </template>
+        </div>
+
+        <!-- Input -->
+        <div class="chat-input-container">
+            <div class="chat-input-wrapper">
+                <textarea
+                    x-model="input"
+                    @keydown="handleKeydown($event)"
+                    @input="autoResizeTextarea($el)"
+                    placeholder="Send a message..."
+                    :disabled="isProcessing"
+                    rows="1"
+                ></textarea>
+                <button @click="send()" :disabled="isProcessing || !input.trim()">
+                    Send
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div class="settings-panel" :class="{ open: settingsOpen }" x-data="settingsComponent()" x-init="init()">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2>Settings</h2>
+            <button @click="settingsOpen = false" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 18px;">&times;</button>
+        </div>
+
+        <div class="settings-group">
+            <h3>Chat Model</h3>
+            <div class="settings-field">
+                <label>Model Name</label>
+                <select x-model="settings.chat_model && settings.chat_model.model_name">
+                    <template x-for="m in models" :key="m.name">
+                        <option :value="m.name" x-text="m.name + ' (' + formatBytes(m.size) + ')'"></option>
+                    </template>
+                </select>
+            </div>
+            <div class="settings-field">
+                <label>Temperature</label>
+                <input type="number" step="0.1" min="0" max="2"
+                    x-model.number="settings.chat_model && settings.chat_model.temperature">
+            </div>
+            <div class="settings-field">
+                <label>Context Length</label>
+                <input type="number" step="1024" min="1024"
+                    x-model.number="settings.chat_model && settings.chat_model.ctx_length">
+            </div>
+        </div>
+
+        <div class="settings-group">
+            <h3>Utility Model</h3>
+            <div class="settings-field">
+                <label>Model Name</label>
+                <select x-model="settings.utility_model && settings.utility_model.model_name">
+                    <template x-for="m in models" :key="m.name">
+                        <option :value="m.name" x-text="m.name"></option>
+                    </template>
+                </select>
+            </div>
+        </div>
+
+        <div class="settings-group">
+            <h3>Memory</h3>
+            <div class="settings-field">
+                <label>Recall Enabled</label>
+                <select x-model="settings.memory_recall_enabled">
+                    <option :value="true">Enabled</option>
+                    <option :value="false">Disabled</option>
+                </select>
+            </div>
+            <div class="settings-field">
+                <label>Recall Threshold (0-1)</label>
+                <input type="number" step="0.05" min="0" max="1"
+                    x-model.number="settings.memory_recall_threshold">
+            </div>
+        </div>
+
+        <div class="settings-group">
+            <h3>Agent</h3>
+            <div class="settings-field">
+                <label>Max Monologue Iterations</label>
+                <input type="number" min="1" max="100"
+                    x-model.number="settings.max_monologue_iterations">
+            </div>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <button @click="save()" :disabled="saving"
+                style="width: 100%; padding: 10px; background: var(--accent); color: var(--bg-primary); border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                <span x-text="saving ? 'Saving...' : 'Save Settings'"></span>
+            </button>
+            <div x-show="message" x-text="message"
+                style="margin-top: 8px; font-size: 12px; color: var(--green); text-align: center;"></div>
+        </div>
+
+        <!-- Models List -->
+        <div class="settings-group" style="margin-top: 24px;">
+            <h3>Available Ollama Models</h3>
+            <template x-for="m in models" :key="m.name">
+                <div style="padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px;">
+                    <span x-text="m.name" style="color: var(--text-primary);"></span>
+                    <span x-text="formatBytes(m.size)" style="color: var(--text-secondary); float: right;"></span>
+                </div>
+            </template>
+            <div x-show="models.length === 0" style="color: var(--text-secondary); font-size: 12px; padding: 8px 0;">
+                No models found. Run: ollama pull llama3.2
+            </div>
+        </div>
+    </div>
+
+</div>
+
+</body>
+</html>

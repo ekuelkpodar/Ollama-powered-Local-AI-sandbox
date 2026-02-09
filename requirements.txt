@@ -1,0 +1,18 @@
+# Local Ollama Agents - Dependencies
+
+# Core
+aiohttp>=3.9.0
+flask>=3.0.0
+flask-cors>=4.0.0
+
+# Memory & Embeddings
+faiss-cpu>=1.7.4
+sentence-transformers>=2.2.0
+numpy>=1.24.0
+
+# Knowledge Import
+PyPDF2>=3.0.0
+beautifulsoup4>=4.12.0
+
+# Utilities
+tiktoken>=0.7.0
