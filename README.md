@@ -1,6 +1,6 @@
 # Local Ollama Agents
 
-A local multi-agent AI framework powered entirely by Ollama. Inspired by Agent Zero's architecture — monologue loop, multi-agent delegation, FAISS memory, extensible tools — running 100% locally with no cloud APIs.
+A local multi-agent AI framework powered entirely by Ollama — monologue loop, multi-agent delegation, FAISS memory, extensible tools — running 100% locally with no cloud APIs.
 
 ## Features
 
