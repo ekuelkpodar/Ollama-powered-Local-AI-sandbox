@@ -3,7 +3,15 @@
 import os
 import importlib
 import inspect
+from typing import TypedDict
+
 from tools.base_tool import Tool
+from tools.mcp_bridge import MCPBridge
+
+
+class ToolSchema(TypedDict):
+    arg_schema: dict[str, type | tuple[type, ...]]
+    required_args: list[str]
 
 
 class ToolRegistry:
@@ -33,6 +41,31 @@ class ToolRegistry:
             except Exception as e:
                 print(f"[ToolRegistry] Failed to load {module_name}: {e}")
 
+        self._register_mcp_tools()
+
+    def _register_mcp_tools(self) -> None:
+        """Discover and register MCP tools if enabled."""
+        try:
+            if not self.agent.config.mcp.enabled:
+                return
+        except Exception:
+            return
+
+        bridge = self.agent.context.data.get("mcp_bridge")
+        if bridge is None:
+            bridge = MCPBridge(self.agent.config)
+            self.agent.context.data["mcp_bridge"] = bridge
+
+        try:
+            mcp_tools = bridge.discover_tools_sync()
+            for name, cls in mcp_tools.items():
+                if name in self._tool_classes:
+                    print(f"[ToolRegistry] MCP tool name collision: {name}")
+                    continue
+                self._tool_classes[name] = cls
+        except Exception as e:
+            print(f"[ToolRegistry] Failed to load MCP tools: {e}")
+
     def get_tool(self, name: str) -> Tool | None:
         """Instantiate and return a tool by name."""
         cls = self._tool_classes.get(name)
@@ -52,3 +85,15 @@ class ToolRegistry:
     def tool_names(self) -> list[str]:
         """List all registered tool names."""
         return sorted(self._tool_classes.keys())
+
+    def get_tool_schemas(self) -> dict[str, ToolSchema]:
+        """Return argument schemas for all tools."""
+        schemas: dict[str, ToolSchema] = {}
+        for name, cls in self._tool_classes.items():
+            arg_schema = getattr(cls, "arg_schema", {}) or {}
+            required_args = getattr(cls, "required_args", []) or []
+            schemas[name] = {
+                "arg_schema": arg_schema,
+                "required_args": list(required_args),
+            }
+        return schemas

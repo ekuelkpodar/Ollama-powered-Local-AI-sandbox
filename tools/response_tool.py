@@ -7,6 +7,9 @@ from agent.response import Response
 class ResponseTool(Tool):
     name = "response"
     description = "Deliver your final answer to the user."
+    arg_schema = {"text": str}
+    required_args = ["text"]
+    cacheable = False
 
     async def execute(self, **kwargs) -> Response:
         text = kwargs.get("text", "")

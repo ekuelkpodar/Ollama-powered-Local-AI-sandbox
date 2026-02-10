@@ -20,7 +20,8 @@ To use a tool, include a JSON block in your response like this:
 ```
 
 **Rules:**
-- Use exactly ONE tool call per response
+- Use one tool call per response by default
+- If you need multiple independent actions, you may include multiple JSON tool calls (each in its own ```json block)
 - You may include reasoning text before the tool call
 - Always wrap the JSON in a ```json code fence
 - When you have a final answer for the user, you MUST use the `response` tool

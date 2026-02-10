@@ -4,10 +4,12 @@
 aiohttp>=3.9.0
 flask>=3.0.0
 flask-cors>=4.0.0
+bcrypt>=4.1.0
 
 # Memory (embeddings via Ollama /api/embed)
 faiss-cpu>=1.7.4
 numpy>=1.24.0
+sentence-transformers>=2.7.0
 
 # Knowledge Import
 PyPDF2>=3.0.0

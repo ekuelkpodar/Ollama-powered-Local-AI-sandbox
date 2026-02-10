@@ -1,26 +1,104 @@
 {
   "chat_model": {
-    "model_name": "kimi-k2.5:cloud",
     "base_url": "http://localhost:11434",
-    "temperature": 0.7,
     "ctx_length": 8192,
-    "options": {}
-  },
-  "utility_model": {
     "model_name": "kimi-k2.5:cloud",
-    "base_url": "http://localhost:11434",
-    "temperature": 0.3,
-    "ctx_length": 4096,
-    "options": {}
+    "temperature": 0.7
+  },
+  "ollama": {
+    "connect_timeout": 5,
+    "read_timeout": 120,
+    "max_retries": 3,
+    "health_check_on_start": true
+  },
+  "session": {
+    "persist": true,
+    "storage_path": "./data/sessions.db",
+    "auto_save": true,
+    "max_sessions": 100
+  },
+  "model_router": {
+    "enabled": false,
+    "routes": {
+      "reasoning": "kimi-k2.5:cloud",
+      "coding": "codellama",
+      "summarization": "phi3:mini",
+      "default": "kimi-k2.5:cloud"
+    },
+    "tool_affinity": {
+      "code_execution": "coding",
+      "knowledge": "summarization",
+      "call_subordinate": "reasoning"
+    }
+  },
+  "tool_execution": {
+    "default_timeout": 30,
+    "timeouts": {},
+    "cache_enabled": true
+  },
+  "memory": {
+    "importance_scoring": true,
+    "ttl_days": 30,
+    "compaction_enabled": true,
+    "compaction_threshold": 1000,
+    "namespaces": ["global", "user", "project"],
+    "embedding_provider": "ollama",
+    "ollama_embedding_model": "nomic-embed-text"
+  },
+  "rag": {
+    "chunk_strategy": "semantic",
+    "chunk_size": 512,
+    "chunk_overlap": 64,
+    "rerank_enabled": true,
+    "hybrid_search": true,
+    "bm25_weight": 0.3,
+    "vector_weight": 0.7,
+    "semantic_threshold": 0.75
+  },
+  "mcp": {
+    "enabled": false,
+    "servers": [
+      {
+        "name": "filesystem",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+        "transport": "stdio"
+      },
+      {
+        "name": "web-search",
+        "url": "http://localhost:8080/sse",
+        "transport": "sse"
+      }
+    ]
+  },
+  "auth": {
+    "enabled": false,
+    "username": "admin",
+    "password_hash": "",
+    "api_key": ""
+  },
+  "extensions": {
+    "memory_recall": true,
+    "message_trimmer": true,
+    "output_logger": true
+  },
+  "telemetry": {
+    "enabled": false,
+    "log_dir": "./data/metrics",
+    "otel_enabled": false,
+    "otel_endpoint": null,
+    "otel_service_name": "local-ollama-agents"
   },
   "embedding_model": "nomic-embed-text",
-  "prompt_profile": "default",
   "max_monologue_iterations": 25,
+  "memory_recall_count": 5,
   "memory_recall_enabled": true,
   "memory_recall_threshold": 0.6,
-  "memory_recall_count": 5,
-  "data_dir": "data",
-  "knowledge_dir": "data/knowledge",
-  "memory_dir": "data/memory",
-  "log_dir": "data/logs"
+  "prompt_profile": "default",
+  "utility_model": {
+    "base_url": "http://localhost:11434",
+    "ctx_length": 4096,
+    "model_name": "kimi-k2.5:cloud",
+    "temperature": 0.3
+  }
 }

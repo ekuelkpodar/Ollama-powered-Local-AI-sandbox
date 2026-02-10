@@ -274,6 +274,16 @@ python run_web.py
 # Open http://localhost:5000
 ```
 
+### Docker (Optional)
+
+Run the full stack with Ollama + agent in containers:
+
+```bash
+docker compose up --build
+```
+
+The agent will be available at `http://localhost:5000`. The Ollama service is exposed at `http://localhost:11434`.
+
 ## Configuration
 
 Edit `config.json` to change models, temperatures, context lengths, and memory settings:

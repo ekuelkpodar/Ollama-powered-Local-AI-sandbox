@@ -7,6 +7,13 @@ from agent.response import Response
 class CallSubordinateTool(Tool):
     name = "call_subordinate"
     description = "Delegate a task to a subordinate agent."
+    arg_schema = {
+        "task": str,
+        "system_prompt": str,
+    }
+    required_args = ["task"]
+    cacheable = False
+    parallel_safe = False
 
     async def execute(self, **kwargs) -> Response:
         task = kwargs.get("task", "")

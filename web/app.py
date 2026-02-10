@@ -11,6 +11,7 @@ from agent.config import AgentConfig
 from agent.agent_context import AgentContext
 from memory.memory_manager import MemoryManager
 from extensions.extension_manager import ExtensionManager
+from web.auth import init_auth
 
 
 def create_app(config: AgentConfig) -> Flask:
@@ -22,6 +23,9 @@ def create_app(config: AgentConfig) -> Flask:
     # Shared state
     app.config["agent_config"] = config
     app.config["sessions"] = {}  # session_id -> SessionState
+    app.config["config_path"] = "config.json"
+
+    init_auth(app, config.auth)
 
     # Register blueprints
     from web.routes.chat import chat_bp
@@ -29,12 +33,14 @@ def create_app(config: AgentConfig) -> Flask:
     from web.routes.models import models_bp
     from web.routes.memory_routes import memory_bp
     from web.routes.knowledge_routes import knowledge_bp
+    from web.routes.metrics import metrics_bp
 
     app.register_blueprint(chat_bp, url_prefix="/api")
     app.register_blueprint(settings_bp, url_prefix="/api")
     app.register_blueprint(models_bp, url_prefix="/api")
     app.register_blueprint(memory_bp, url_prefix="/api")
     app.register_blueprint(knowledge_bp, url_prefix="/api")
+    app.register_blueprint(metrics_bp, url_prefix="/api")
 
     @app.route("/")
     def index():
@@ -46,15 +52,15 @@ def create_app(config: AgentConfig) -> Flask:
 class SessionState:
     """Holds the state for one chat session."""
 
-    def __init__(self, config: AgentConfig):
+    def __init__(self, config: AgentConfig, session_id: str | None = None):
         self.config = config
-        self.context = AgentContext(config)
+        self.context = AgentContext(config, session_id=session_id)
         self.stream_queue: queue.Queue = queue.Queue()
         self.is_running = False
         self.final_response: str | None = None
 
         # Initialize memory manager
-        mm = MemoryManager(config)
+        mm = MemoryManager(config, telemetry=self.context.telemetry)
         self.context.data["memory_manager"] = mm
 
         # Initialize extensions

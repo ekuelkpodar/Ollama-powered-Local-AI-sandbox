@@ -11,4 +11,6 @@ Memory is organized into areas:
 - **solutions** — successful approaches to problems
 - **knowledge** — imported documents and reference material
 
+Memories can also be stored in **namespaces** (e.g., `global`, `user`, `project`) to separate contexts.
+
 Use the `memory` tool to interact with your memories. Relevant memories from past conversations will be automatically recalled and shown below when available.
