@@ -54,6 +54,7 @@ class FAISSStore:
         k: int = 5,
         area: str | None = None,
         threshold: float = 0.0,
+        include_indices: bool = False,
     ) -> list[dict]:
         """
         Search for similar vectors.
@@ -76,7 +77,10 @@ class FAISSStore:
             meta = self.metadata[idx]
             if area and meta.get("area") != area:
                 continue
-            results.append({**meta, "score": float(score)})
+            result = {**meta, "score": float(score)}
+            if include_indices:
+                result["_index"] = int(idx)
+            results.append(result)
             if len(results) >= k:
                 break
 
@@ -115,6 +119,16 @@ class FAISSStore:
         self.index = faiss.IndexFlatIP(self.dimension)
         self.metadata = []
         self._save()
+
+    def update_metadata_bulk(self, indices: list[int], update_fn: Callable[[dict], None]):
+        """Update metadata in bulk and persist changes."""
+        updated = False
+        for idx in indices:
+            if 0 <= idx < len(self.metadata):
+                update_fn(self.metadata[idx])
+                updated = True
+        if updated:
+            self._save()
 
     @property
     def count(self) -> int:

@@ -5,30 +5,70 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Local Ollama Agents</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/highlight.min.js"></script>
     <script src="/static/js/utils.js"></script>
     <script src="/static/js/app.js"></script>
     <script src="/static/js/chat.js"></script>
+    <script src="/static/js/sessions.js"></script>
     <script src="/static/js/settings.js"></script>
 </head>
 <body>
 
-<div class="app-container" x-data="{ settingsOpen: false }">
+<div class="app-container" x-data="{ settingsOpen: false }" @toggle-settings.window="settingsOpen = !settingsOpen">
 
     <!-- Sidebar -->
-    <div class="sidebar">
+    <div class="sidebar" x-data="sessionsComponent()" x-init="init()">
         <div class="sidebar-header">
-            <h1>Local Ollama Agents</h1>
-            <div class="subtitle">Multi-Agent AI Framework</div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1>Local Ollama Agents</h1>
+                    <div class="subtitle">Multi-Agent AI Framework</div>
+                </div>
+                <button class="icon-button" @click="$dispatch('toggle-settings')" title="Settings">⚙</button>
+            </div>
         </div>
 
         <div class="sidebar-actions">
             <button @click="$dispatch('new-session')">+ New Chat</button>
         </div>
 
-        <div class="sidebar-nav">
-            <button class="active" @click="settingsOpen = false">Chat</button>
-            <button @click="settingsOpen = !settingsOpen">Settings</button>
+        <div class="sidebar-search">
+            <input type="text" placeholder="Search sessions" x-model="search">
+        </div>
+
+        <div class="session-list">
+            <template x-for="session in filteredSessions" :key="session.session_id">
+                <div class="session-item" :class="{ active: session.session_id === activeSessionId }">
+                    <div class="session-main" @click="openSession(session)">
+                        <div class="session-title" x-text="sessionLabel(session)"></div>
+                        <div class="session-meta">
+                            <span x-text="formatUpdated(session)"></span>
+                            <span x-text="(session.message_count || 0) + ' msgs'"></span>
+                        </div>
+                    </div>
+                    <div class="session-actions">
+                        <button @click.stop="startRename(session)">Rename</button>
+                        <button @click.stop="deleteSession(session)">Delete</button>
+                    </div>
+                    <template x-if="editingId === session.session_id">
+                        <div class="session-rename">
+                            <input x-model="editTitle"
+                                @keydown.enter="saveRename(session)"
+                                @keydown.escape="cancelRename()"
+                                placeholder="Session title">
+                            <div class="session-rename-actions">
+                                <button @click="saveRename(session)">Save</button>
+                                <button @click="cancelRename()">Cancel</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </template>
+            <div class="session-empty" x-show="filteredSessions.length === 0">
+                No sessions yet.
+            </div>
         </div>
 
         <div class="sidebar-footer" x-data="{ status: 'checking' }" x-init="
@@ -42,7 +82,9 @@
     </div>
 
     <!-- Main Chat Area -->
-    <div class="main-area" x-data="chatComponent()" x-init="init()" @new-session.window="newSession()">
+    <div class="main-area" x-data="chatComponent()" x-init="init()"
+        @new-session.window="newSession()"
+        @load-session.window="loadSession($event.detail.session_id)">
 
         <!-- Chat Header -->
         <div class="chat-header">
@@ -71,15 +113,72 @@
             <!-- Message list -->
             <template x-for="(msg, i) in messages" :key="i">
                 <div class="message" :class="msg.role">
-                    <template x-if="msg.role === 'assistant'">
-                        <div class="agent-label">Agent 0</div>
+                    <template x-if="msg.role === 'tool'">
+                        <div class="tool-card">
+                            <div class="tool-header">
+                                <div>
+                                    <div class="tool-title" x-text="msg.tool_label"></div>
+                                    <div class="tool-subtitle" x-show="msg.tool_subtitle" x-text="msg.tool_subtitle"></div>
+                                </div>
+                                <div class="tool-pill-group">
+                                    <span class="tool-status" :class="msg.tool_status" x-text="msg.tool_status_label"></span>
+                                    <span class="tool-badge" x-text="msg.tool_name"></span>
+                                </div>
+                            </div>
+
+                            <template x-if="msg.memory_results && msg.memory_results.length">
+                                <div class="memory-results">
+                                    <template x-for="(mem, j) in msg.memory_results" :key="j">
+                                        <div class="memory-item">
+                                            <div class="memory-meta">
+                                                <span x-text="mem.namespace + '/' + mem.area"></span>
+                                                <span>score: <span x-text="mem.score"></span></span>
+                                                <template x-if="mem.importance">
+                                                    <span>importance: <span x-text="mem.importance"></span></span>
+                                                </template>
+                                            </div>
+                                            <div class="memory-content" x-text="mem.content"></div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+
+                            <template x-if="msg.is_code && msg.tool_args && msg.tool_args.code">
+                                <div class="tool-section">
+                                    <div class="tool-label">Code</div>
+                                    <pre><code :class="'language-' + msg.code_language" x-text="msg.tool_args.code"></code></pre>
+                                </div>
+                            </template>
+
+                            <details class="tool-details">
+                                <summary>Details</summary>
+                                <template x-if="msg.args_pretty">
+                                    <div class="tool-section">
+                                        <div class="tool-label">Args</div>
+                                        <pre><code class="language-json" x-text="msg.args_pretty"></code></pre>
+                                    </div>
+                                </template>
+                                <div class="tool-section">
+                                    <div class="tool-label">Result</div>
+                                    <pre><code :class="'language-' + msg.result_language" x-text="msg.result_pretty"></code></pre>
+                                </div>
+                            </details>
+                        </div>
                     </template>
-                    <div x-text="msg.content"></div>
-                    <template x-if="msg.reasoning && msg.reasoning !== msg.content">
-                        <details style="margin-top: 8px; font-size: 12px;">
-                            <summary style="cursor: pointer; color: var(--text-secondary);">Show reasoning</summary>
-                            <div class="tool-call" x-text="msg.reasoning" style="margin-top: 4px; max-height: 200px; overflow-y: auto;"></div>
-                        </details>
+
+                    <template x-if="msg.role !== 'tool'">
+                        <div>
+                            <template x-if="msg.role === 'assistant'">
+                                <div class="agent-label">Agent 0</div>
+                            </template>
+                            <div x-text="msg.content"></div>
+                            <template x-if="msg.reasoning && msg.reasoning !== msg.content">
+                                <details style="margin-top: 8px; font-size: 12px;">
+                                    <summary style="cursor: pointer; color: var(--text-secondary);">Show reasoning</summary>
+                                    <div class="tool-call" x-text="msg.reasoning" style="margin-top: 4px; max-height: 200px; overflow-y: auto;"></div>
+                                </details>
+                            </template>
+                        </div>
                     </template>
                 </div>
             </template>
@@ -177,6 +276,77 @@
             </div>
         </div>
 
+        <div class="settings-group">
+            <h3>Model Manager</h3>
+            <div class="settings-field">
+                <label>Pull Model</label>
+                <div class="inline-field">
+                    <input type="text" placeholder="e.g. llama3.2" x-model="pullModelName">
+                    <button class="secondary-button" @click="startModelPull()">Pull</button>
+                </div>
+            </div>
+            <template x-if="pullJob">
+                <div class="pull-log">
+                    <div class="pull-status" x-text="'Status: ' + pullJob.status"></div>
+                    <pre x-text="(pullJob.output || []).join('\n')"></pre>
+                </div>
+            </template>
+            <div class="status-message" x-show="pullMessage" x-text="pullMessage"></div>
+        </div>
+
+        <div class="settings-group">
+            <h3>Memory Browser</h3>
+            <div class="settings-field">
+                <label>Namespace</label>
+                <select x-model="memoryNamespace" @change="loadMemoryList()">
+                    <template x-for="ns in memoryNamespaces" :key="ns">
+                        <option :value="ns" x-text="ns"></option>
+                    </template>
+                </select>
+            </div>
+            <div class="settings-field">
+                <label>Search</label>
+                <div class="inline-field">
+                    <input type="text" placeholder="Search memory..." x-model="memorySearch"
+                        @keydown.enter="searchMemory()">
+                    <button class="secondary-button" @click="searchMemory()">Search</button>
+                </div>
+            </div>
+            <div class="memory-browser">
+                <template x-for="mem in memoryResults" :key="mem.memory_id || mem.timestamp">
+                    <div class="memory-row">
+                        <div class="memory-row-header">
+                            <span x-text="mem.namespace || memoryNamespace"></span>
+                            <span x-text="mem.area"></span>
+                            <span x-text="mem.timestamp || mem.created_at"></span>
+                            <template x-if="mem.score">
+                                <span x-text="'score: ' + Number(mem.score).toFixed(2)"></span>
+                            </template>
+                        </div>
+                        <div class="memory-row-content" x-text="mem.content"></div>
+                        <button class="danger-button" @click="deleteMemory(mem)">Delete</button>
+                    </div>
+                </template>
+                <div class="status-message" x-show="memoryResults.length === 0">No memories found.</div>
+                <div class="status-message" x-show="memoryMessage" x-text="memoryMessage"></div>
+            </div>
+        </div>
+
+        <div class="settings-group">
+            <h3>Extensions</h3>
+            <template x-for="ext in extensions" :key="ext.name">
+                <div class="toggle-row">
+                    <span x-text="ext.name"></span>
+                    <label class="switch">
+                        <input type="checkbox" :checked="ext.enabled" @change="toggleExtension(ext, $event)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </template>
+            <div class="status-message" x-show="extensions.length === 0">No extensions found.</div>
+            <div class="status-message" x-show="extensionMessage" x-text="extensionMessage"></div>
+        </div>
+
         <div style="margin-top: 20px;">
             <button @click="save()" :disabled="saving"
                 style="width: 100%; padding: 10px; background: var(--accent); color: var(--bg-primary); border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
@@ -198,6 +368,13 @@
             <div x-show="models.length === 0" style="color: var(--text-secondary); font-size: 12px; padding: 8px 0;">
                 No models found. Run: ollama pull llama3.2
             </div>
+        </div>
+
+        <div class="settings-group">
+            <h3>Config Editor</h3>
+            <textarea class="config-editor" rows="12" x-model="rawConfig"></textarea>
+            <button class="secondary-button full-width" @click="saveRawConfig()">Save Config</button>
+            <div class="status-message" x-show="rawMessage" x-text="rawMessage"></div>
         </div>
     </div>
 

@@ -37,9 +37,12 @@ class MemoryRecallExtension(Extension):
                 lines = ["## Recalled Memories\n"]
                 for r in results:
                     area = r.get("area", "?")
+                    namespace = r.get("namespace", "?")
                     content = r.get("content", "")
-                    score = r.get("score", 0)
-                    lines.append(f"- [{area}] (relevance: {score:.2f}) {content}")
+                    score = r.get("hybrid_score", r.get("score", 0))
+                    lines.append(
+                        f"- [{namespace}/{area}] (relevance: {score:.2f}) {content}"
+                    )
                 agent.data["memory_context"] = "\n".join(lines)
             else:
                 agent.data["memory_context"] = ""

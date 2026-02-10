@@ -35,7 +35,12 @@ class ExtensionManager:
                 for _, obj in inspect.getmembers(module, inspect.isclass):
                     if issubclass(obj, Extension) and obj is not Extension and obj.name:
                         ext = obj(self.config)
-                        if ext.enabled:
+                        enabled_override = None
+                        if hasattr(self.config, "extensions"):
+                            enabled_override = self.config.extensions.enabled_map.get(ext.name)
+                        if enabled_override is False:
+                            continue
+                        if enabled_override is True or ext.enabled:
                             self.extensions.append(ext)
             except Exception as e:
                 print(f"[ExtensionManager] Failed to load {module_name}: {e}")

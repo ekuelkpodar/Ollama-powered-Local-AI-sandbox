@@ -9,6 +9,11 @@ class Tool(ABC):
 
     name: str = ""
     description: str = ""
+    arg_schema: dict[str, type | tuple[type, ...]] = {}
+    required_args: list[str] = []
+    timeout_seconds: float | None = None
+    cacheable: bool = True
+    parallel_safe: bool = True
 
     def __init__(self, agent):
         self.agent = agent
@@ -25,6 +30,14 @@ class Tool(ABC):
     async def after_execution(self, response: Response) -> Response:
         """Hook called after execute. Override to modify response."""
         return response
+
+    def should_cache(self, **kwargs) -> bool:
+        """Whether this tool call should be cached."""
+        return self.cacheable
+
+    def is_parallel_safe(self, **kwargs) -> bool:
+        """Whether this tool call can be executed in parallel."""
+        return self.parallel_safe
 
     def get_prompt_description(self) -> str:
         """Return the prompt description for this tool. Loaded from prompts/ if available."""

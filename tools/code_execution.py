@@ -101,6 +101,13 @@ class PersistentSession:
 class CodeExecutionTool(Tool):
     name = "code_execution"
     description = "Execute code in a persistent terminal session."
+    arg_schema = {
+        "runtime": str,
+        "code": str,
+    }
+    required_args = ["code"]
+    cacheable = False
+    parallel_safe = False
 
     async def execute(self, **kwargs) -> Response:
         runtime = kwargs.get("runtime", "python")
